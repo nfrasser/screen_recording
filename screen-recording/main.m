@@ -16,8 +16,12 @@
 
 #import <Foundation/Foundation.h>
 #import <AppKit/NSRunningApplication.h>
-#import <AVFoundation/AVFoundation.h>
+
+@import CoreMediaIO;
+@import AVFoundation;
+
 #import "RecordingDelegate.h"
+
 
 AVCaptureSession* capture;
 
@@ -36,11 +40,11 @@ void focusPidWithAppleScript(NSNumber* pidNumber) {
     // http://stackoverflow.com/questions/7925123/how-can-i-pass-a-string-from-applescript-to-objective-c
     // applescript code from: http://stackoverflow.com/a/2401792
     NSString* applescript = [NSString stringWithFormat:@"tell application \"System Events\"\n"
-    "    set targets to every process whose unix id is %@\n"
-    "    repeat with target in targets\n"
-    "        set the frontmost of target to true\n"
-    "    end repeat\n"
-    "end tell", pidNumber];
+                             "    set targets to every process whose unix id is %@\n"
+                             "    repeat with target in targets\n"
+                             "        set the frontmost of target to true\n"
+                             "    end repeat\n"
+                             "end tell", pidNumber];
 
     [[[NSAppleScript alloc] initWithSource:applescript] executeAndReturnError:nil ];
 }
@@ -78,11 +82,10 @@ NSDictionary* findWindowBoundsAndPid(NSString* ownerName) {
             CGRectMakeWithDictionaryRepresentation((CFDictionaryRef)objc_unretainedPointer([info objectForKey:(NSString *)kCGWindowBounds]), &windowRect);
             CGGetDisplaysWithRect(windowRect, 1, &displayID, NULL);
 
-            return @{ @"found"  : windowID ? @YES : @NO, // NSNumber
-                      @"pid"    : pid, // NSNumber
-                      @"bounds" : [NSValue valueWithRect:windowRect],
-                      @"displayID" : [NSNumber numberWithInt:displayID]
-                    };
+            return @{ @"found"      : windowID ? @YES : @NO, // NSNumber
+                      @"pid"        : pid, // NSNumber
+                      @"bounds"     : [NSValue valueWithRect:windowRect],
+                      @"displayID"  : [NSNumber numberWithInt:displayID] };
         }
     }
 
@@ -100,18 +103,12 @@ NSDictionary* findWithRetry(NSString* ownerName) {
         }
         [NSThread sleepForTimeInterval:1.0f];
     }
-
     return result;
 }
 
 // Locate iOS Window and return found, pid, bounds, and displayID.
 NSDictionary* findiOSWindowBoundsAndPid() {
-    return findWithRetry(@"iOS Simulator");
-}
-
-// Locate Android Window and return found, pid, bounds, and displayID.
-NSDictionary* findAndroidWindowBoundsAndPid() {
-    return findWithRetry(@"emulator64-x86");
+    return findWindowBoundsAndPid(@"iOS Simulator");
 }
 
 // Deletes the file. Errors if the file is a directory or deletion fails.
@@ -147,33 +144,11 @@ CGRect makeCropRect(int displayID, NSValue* windowValueWithRect) {
     return CGRectMake(x, y, width, height);
 }
 
-void stopRunning() {
-    [capture stopRunning];
-    // Must wait a few moments after ending or the movie will be corrupt.
-    // the corruption is easy to reproduce when recording 10 seconds or less of video.
-    [NSThread sleepForTimeInterval:5.0f];
-    exit(0);
-}
 
-void run(NSString* os, NSString* path) {
-    #ifdef DEBUG
-        NSLog(@"DEBUG mode enabled.");
-    #endif
-    deleteFile(path);
-
+AVCaptureScreenInput* findScreenVideoInput() {
     NSDictionary* targetWindow;
-    NSArray* validOS = @[@"ios", @"android"];
-    switch ([validOS indexOfObject:os]) {
-        case 0: // @"ios"
-            targetWindow = findiOSWindowBoundsAndPid();
-            break;
-        case 1: // @"android"
-            targetWindow = findAndroidWindowBoundsAndPid();
-            break;
-        default:
-            logAndExit(@"Unknown os: %@", os);
-            break;
-    }
+
+    targetWindow = findiOSWindowBoundsAndPid();
 
     // only objects are stored in NSDictionary. no primitives
     // we must extract the int value of NSNumber to use as boolean
@@ -182,9 +157,10 @@ void run(NSString* os, NSString* path) {
     Log(@"found: %i = %@", found, found ? @"Yes" : @"No");
 
     if (!found) {
-        logAndExit(@"%@ window not found.", os);
+        Log(@"Simulator window not found.");
+        return nil;
     } else {
-        Log(@"Found is true!");
+        Log(@"Simulator found!");
     }
 
     NSNumber* pid = [targetWindow objectForKey:@"pid"];
@@ -206,47 +182,97 @@ void run(NSString* os, NSString* path) {
     screen.capturesCursor = 0;
     screen.capturesMouseClicks = 0;
 
+    return [[AVCaptureScreenInput alloc] initWithDisplayID:displayID];
+}
+
+// Returns capture input for a connected device screen.
+// Selects the first available connected iOS device.
+// Errors if no iOS device is connected
+AVCaptureDeviceInput* findDeviceVideoInput() {
+    CMIOObjectPropertyAddress prop = { kCMIOHardwarePropertyAllowScreenCaptureDevices, kCMIOObjectPropertyScopeGlobal, kCMIOObjectPropertyElementMaster };
+
+    UInt32 allow = 1;
+    CMIOObjectSetPropertyData(kCMIOObjectSystemObject, &prop, 0, NULL, sizeof(allow), &allow);
+
+    NSArray *devices = [AVCaptureDevice devicesWithMediaType:AVMediaTypeMuxed];
+
+    for (NSInteger i = 0; i < devices.count; i++) {
+        AVCaptureDevice *device = devices[i];
+        if ([device.modelID compare:@"iOS Device"] == NSOrderedSame) {
+            NSError *error = nil;
+            Log(@"Found iOS Device: %@", device.localizedName);
+            return [[AVCaptureDeviceInput alloc] initWithDevice:device error:&error];
+        }
+    }
+
+    return nil;
+}
+
+// Returns the required video input device
+AVCaptureInput* findVideoInput() {
+    AVCaptureInput *camera;
+    if ((camera = findScreenVideoInput()) || (camera = findDeviceVideoInput())) {
+        return camera;
+    }
+    logAndExit(@"iOS device not found");
+    return nil;
+}
+
+void stopRunning() {
+    [capture stopRunning];
+    // Must wait a few moments after ending or the movie will be corrupt.
+    // the corruption is easy to reproduce when recording 10 seconds or less of video.
+    [NSThread sleepForTimeInterval:5.0f];
+    exit(0);
+}
+
+void run(NSString* path) {
+#ifdef DEBUG
+    NSLog(@"DEBUG mode enabled.");
+#endif
+    deleteFile(path);
+
+    AVCaptureInput* camera = findVideoInput();
     AVCaptureMovieFileOutput* movie = [[AVCaptureMovieFileOutput alloc] init];
     capture = [[AVCaptureSession alloc] init];
-    
+
     // now that capture exists, register the exit signal handlers.
     signal(SIGTERM, stopRunning); // signal 15
     signal(SIGINT, stopRunning); // signal 2
-    
+
     [capture beginConfiguration];
     [capture setSessionPreset:AVCaptureSessionPresetHigh];
-    [capture addInput:screen];
+    [capture addInput:camera];
     [capture addOutput:movie];
     [capture commitConfiguration];
-    
+
     [capture startRunning];
 
     RecordingDelegate* delegate = [[RecordingDelegate alloc] init];
-    
+
     [movie setDelegate:delegate];
     NSURL* pathURL = [NSURL fileURLWithPath:path];
 
     [movie startRecordingToOutputFileURL:pathURL recordingDelegate:delegate];
-    
+
     // Only print recording once we've started to record.
-    NSLog(@":: Recording %@ to %@", os, path);
+    NSLog(@":: Recording to %@", path);
 
     while (true) {
-      [NSThread sleepForTimeInterval:10.0f];
+        [NSThread sleepForTimeInterval:10.0f];
     }
 }
 
 int main(int argc, const char* argv[]) {
     @autoreleasepool {
-        if (argc != 3) {
-            NSLog(@"Usage: ./screen-recording ios /tmp/video.mov");
+        if (argc != 2) {
+            NSLog(@"Usage: ./screen-recording /tmp/video.mov");
             exit(0);
         }
 
-        NSString* os = [NSString stringWithUTF8String:argv[1]]; // "ios"
-        NSString* path = [NSString stringWithUTF8String:argv[2]]; // "/tmp/video.mov"
+        NSString* path = [NSString stringWithUTF8String:argv[1]]; // "/tmp/video.mov"
 
-        run(os, path);
+        run(path);
     }
 
     return 0;
