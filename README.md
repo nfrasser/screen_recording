@@ -1,15 +1,10 @@
-Note: This project is no longer maintained. Checkout [androidtool-mac](https://github.com/mortenjust/androidtool-mac) instead.
-
---
-
 screen_recording
 ================
 
-Activate and record the iOS Simulator or Android emulator to a .mov.
+Activate and record a connected iOS device or the iOS Simulator to a .mov.
 
 ```
-$ ./screen-recording ios /tmp/video.mov
-$ ./screen-recording android /tmp/video.mov
+$ ./screen-recording /tmp/video.mov
 ```
 
 Send SIGINT to stop recording. CMD+C on the OS X Terminal.
