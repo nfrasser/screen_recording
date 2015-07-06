@@ -10,31 +10,31 @@
 	<string>screen-recording</string>
 	<key>IDESourceControlProjectOriginsDictionary</key>
 	<dict>
-		<key>8190DF61-A38C-4F9E-85C6-138CCFDD8817</key>
-		<string>ssh://github.com/bootstraponline/screen_recording.git</string>
+		<key>FD16E8EFA1D9E246293A99E2A400DFC177066CBB</key>
+		<string>https://github.com/nfrasser/screen_recording.git</string>
 	</dict>
 	<key>IDESourceControlProjectPath</key>
-	<string>screen-recording.xcodeproj/project.xcworkspace</string>
+	<string>screen-recording.xcodeproj</string>
 	<key>IDESourceControlProjectRelativeInstallPathDictionary</key>
 	<dict>
-		<key>8190DF61-A38C-4F9E-85C6-138CCFDD8817</key>
+		<key>FD16E8EFA1D9E246293A99E2A400DFC177066CBB</key>
 		<string>../..</string>
 	</dict>
 	<key>IDESourceControlProjectURL</key>
-	<string>ssh://github.com/bootstraponline/screen_recording.git</string>
+	<string>https://github.com/nfrasser/screen_recording.git</string>
 	<key>IDESourceControlProjectVersion</key>
-	<integer>110</integer>
+	<integer>111</integer>
 	<key>IDESourceControlProjectWCCIdentifier</key>
-	<string>8190DF61-A38C-4F9E-85C6-138CCFDD8817</string>
+	<string>FD16E8EFA1D9E246293A99E2A400DFC177066CBB</string>
 	<key>IDESourceControlProjectWCConfigurations</key>
 	<array>
 		<dict>
 			<key>IDESourceControlRepositoryExtensionIdentifierKey</key>
 			<string>public.vcs.git</string>
 			<key>IDESourceControlWCCIdentifierKey</key>
-			<string>8190DF61-A38C-4F9E-85C6-138CCFDD8817</string>
+			<string>FD16E8EFA1D9E246293A99E2A400DFC177066CBB</string>
 			<key>IDESourceControlWCCName</key>
-			<string>screen-recording</string>
+			<string>screen_recording</string>
 		</dict>
 	</array>
 </dict>
